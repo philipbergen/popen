@@ -57,7 +57,7 @@ Piping that output to a file:
 
     Sh('ls', '-la', '~') > '~/listing'
 
-Note that special characters like ``~`` is expanded, as are environment
+Note that special characters like ``~`` are expanded, as are environment
 variables (e.g. ``$HOME``).
 
 Chaining commands is trivial, here with append instead of write to file:
