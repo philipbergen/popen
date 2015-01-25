@@ -1,0 +1,11 @@
+Metadata-Version: 1.0
+Name: popen
+Version: 0.1
+Summary: A shell like DSL front for subprocess.Popen
+Home-page: https://github.com/philipbergen/popen
+Author: philipbergen
+Author-email: philipbergen at gmail com
+License: MIT
+Description: UNKNOWN
+Keywords: shell bash popen
+Platform: UNKNOWN
