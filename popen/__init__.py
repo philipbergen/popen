@@ -16,7 +16,8 @@ All arguments (CMD, FILE, INFILE) may contain special characters for expansion
 such as `~?*!` and environment variables such as `$HOME`.
 
 NOTE: If a command is not evaluated it is not run. A command is evaluated when
-it is piped, redirected or returncode is checked (truth evaluation).
+it is piped, redirected, returncode is checked (truth evaluation) or string
+evaluation.
 '''
 
 import os
@@ -38,15 +39,15 @@ def read_some(fd):
 
 class Sh(object):
     debug = False
-    def __str__(self):
+    def __repr__(self):
         res = []
         t = self
         while t is not None:
-            res.append(repr(t))
+            res.append(t._repr())
             t = t._input
         return ' | '.join(res[::-1])
 
-    def __repr__(self):
+    def _repr(self):
         c = [repr(self._cmd)] + [repr(arg) for arg in self._args]
         res = ['Sh(' + ', '.join(c) + ')']
         if self._cwd:
@@ -198,14 +199,24 @@ class Sh(object):
             if data[0]:
                 yield data[0]
 
+    def communicate(self):
+        '''
+        Similar to Popen.communicate it returns the stdout and stderr content.
+        :return:(stdout, stderr)
+        '''
+        self._run()
+        return self._pop.communicate()
+
     def read(self):
         '''
         Runs the command and reads all stdout.
         :return: All stdout as a single string.
         '''
         self._run()
-        stdout, stderr = self._pop.communicate()
-        return stdout.read()
+        stdout, _ = self._pop.communicate()
+        return stdout
+
+    __str__ = read
 
     def readlines(self):
         '''
@@ -214,7 +225,7 @@ class Sh(object):
         '''
         self._run()
         stdout, stderr = self._pop.communicate()
-        return stdout.readlines()
+        return stdout.splitlines(True)
 
     def _sh(self, cmd, *args):
         '''

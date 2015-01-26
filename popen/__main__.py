@@ -27,3 +27,6 @@ if __name__ == '__main__':
 
     s = Sh('ls') | ['grep', 'blt'] | 'wc "-l"'
     print s, s.returncode
+
+    print "OK", Sh('ls').read()
+    print "OK", Sh('ls').readlines()

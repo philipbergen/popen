@@ -1,3 +1,5 @@
 2015-01-25
  - First pypi version
  - Adding < stdin redirect
+ - Added read, readlines, communicated
+ - Changed the __str__ to evaluate the command and return .read()
