@@ -346,13 +346,22 @@ class Sh(object):
 
         args = [glob_or(arg) for arg in self._args]
         stderr = subprocess.STDOUT if self._err_to_out else None
+        assert not self._stdin or self._input is None, "*** ERROR: Stdin must be none outside of head of chain."
         stdin = self._stdin if self._input is None else self._input._pop.stdout
+        if stdin is not None and getattr(stdin, 'fileno', None) is None:
+            stdin = subprocess.PIPE
         cmd = [self._cmd] + list(itertools.chain.from_iterable(args))
         if self.debug:
             print "*** DEBUG: Run", cmd
         try:
             self._pop = subprocess.Popen(cmd, stdin=stdin, stdout=stdout, stderr=stderr,
                                          close_fds=True, cwd=self._cwd, env=self._env)
+            if stdin == subprocess.PIPE:
+                try:
+                    # TODO: Write a non-blocking reader-writer to ship data here
+                    self._pop.stdin.write(self._stdin.read())
+                except AttributeError:
+                    self._pop.stdin.write(self._stdin)
         except OSError:
             print "*** ERROR: %r failed at %r" % (self, self._original_cmd)
             raise
@@ -381,6 +390,8 @@ class Sh(object):
 
         print 'Lines in "my_input_string":', Sh.pipe([my_string_input]) | 'wc -l'
         :return: Stdin object for chaining Sh commands after.
+
+        WARNING: If iterable is an endless generator command evaluation will never complete.
         '''
         if type(input) in (str, unicode):
             return cls.Stdin.from_file(input)
@@ -389,6 +400,7 @@ class Sh(object):
         except TypeError:
             pass
         return cls.Stdin.from_file(input)
+
 
     class Stdin(object):
         '''
@@ -403,7 +415,9 @@ class Sh(object):
             def __init__(self, src):
                 self._src = chain.from_iterable(src)
 
-            def read(self, n):
+            def read(self, n=None):
+                if n is None:
+                    return "".join(self._src)
                 return "".join(islice(self._src, None, n))
 
         def __init__(self, infile):
@@ -412,6 +426,12 @@ class Sh(object):
             :param infile: File like object
             '''
             self._infile = infile
+
+        def __or__(self, cmd):
+            sh = Sh.make_sh(cmd)
+            assert sh._pop is None, "*** ERROR: Command has already run and is now immutable."
+            sh._stdin = self._infile
+            return sh
 
         def Sh(self, *cmd):
             'See Sh.Sh'
@@ -437,10 +457,4 @@ class Sh(object):
 
         @classmethod
         def from_string(cls, instring):
-            return cls(cls.FileFromIterator([instring]))
-
-        def __or__(self, cmd):
-            sh = Sh.make_sh(cmd)
-            assert sh._pop is None, "*** ERROR: Command has already run and is now immutable."
-            sh._stdin = self._infile
-            return sh
+            return cls(instring)

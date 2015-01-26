@@ -81,3 +81,8 @@ To run a command and let output go to ``stdout``, ask for the return code:
     cmd = Sh('ls') | 'grep polka'
     print cmd.returncode
 
+To pipe a string into a command, wrap in an iterable:
+
+.. code-block:: PY
+
+    print Sh.pipe(['this is a \nmulti line\nstring.']) | 'wc'

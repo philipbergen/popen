@@ -31,7 +31,6 @@ if __name__ == '__main__':
 echo "Running"''')
     Sh(['chmod', 'a+x', 'test script.sh']).returncode
     if str(Sh(['./test script.sh'])) == 'Running\n':
-        Sh(['rm', 'test script.sh']).returncode
         print "OK"
     if Sh.pipe('polka list') | Sh('wc') | 'fmt -1' > 'tango':
         print open('tango').read()
@@ -44,5 +43,15 @@ echo "Running"''')
     print "OK", Sh('ls').readlines()
 
     print "EXPAND", Sh('ls') | Sh('grep', r'~a.*$').expand(False)
-    if Sh('rm polka') and Sh('rm ~/listing.txt'):
+    if Sh(['rm', 'polka list', 'test script.sh', '~/listing.txt']):
         print "DONE"
+
+    print Sh.Stdin.from_string('''Look
+    no hands''') | Sh('wc')
+    buf = StringIO()
+    buf.write('''Look
+    no hands''')
+    buf.seek(0)
+    print Sh.pipe(buf) | Sh('wc')
+    print Sh.pipe(['''Look
+    no hands''']) | Sh('wc')
