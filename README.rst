@@ -15,7 +15,7 @@ Features:
 * Redirect stderr to stdout as ``Sh('make').include_stderr | 'wc'``
 * Redirect output to file as ``Sh('ls') > '~/listing.txt'``
 * Iteration over output lines as ``for line in Sh('ls'):``
-* Streaming input into commands in the chain as ``Sh('grep', '-q', 'code').stdin('~/listing.txt').returncode``
+* Streaming input into commands in the chain as ``Sh.pipe('~/listing.txt').Sh('grep', '-q', 'code').returncode``
 * Expands special characters (``~*!?``)
 * Expands env vars (``$HOME``) as ``print Sh('ls', '$USER', '~/*')``
 * Properly splits strings (``'echo "hole in one"'`` becomes ``['echo', 'hole in one']``)
