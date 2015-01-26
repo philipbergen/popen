@@ -18,6 +18,12 @@ such as `~?*!` and environment variables such as `$HOME`.
 NOTE: If a command is not evaluated it is not run. A command is evaluated when
 it is piped, redirected, returncode is checked (truth evaluation) or string
 evaluation.
+
+NOTE: Usually for grep you wish to NOT expand the input arguments, for that use
+the expand method to disable it. Example:
+
+    Sh('ls') | Sh('grep', r'~a.*$').expand(False)
+
 '''
 
 import os
@@ -29,16 +35,10 @@ import sys
 import fcntl
 import select
 
-def read_some(fd):
-    """ A non-blocking version of .readlines() that will iterate lines as they
-        come but also returns strings without newlines, if that's all there is.
-        :param fd: File to read from, sys.stdin for example.
-        :returns: iterator over stream lines.
-    """
-
 
 class Sh(object):
     debug = False
+
     def __repr__(self):
         res = []
         t = self
@@ -53,7 +53,7 @@ class Sh(object):
         if self._cwd:
             res.append('chdir(%r)' % self._cwd)
         if self._env:
-            res.append('env(' + ', '.join(['%s:%r' % (k,v) for k,v in self._env.iteritems()]) + ')')
+            res.append('env(' + ', '.join(['%s:%r' % (k, v) for k, v in self._env.iteritems()]) + ')')
         if self._err_to_out:
             res.append('err_to_out()')
         if self._stdin:
@@ -68,10 +68,9 @@ class Sh(object):
         self._err_to_out = False
         self._cwd = None
         self._pop = None
-        if len(cmd) == 1:
-            cmd = shlex.split(cmd[0])
-        cmd = [os.path.expanduser(os.path.expandvars(arg)) for arg in cmd]
-        self._cmd, self._args = cmd[0], cmd[1:]
+        self._expand = True
+        self._original_cmd = cmd
+        self.expand(True)
         if self.debug:
             print "*** DEBUG: Sh(%r, %r)" % (self._cmd, self._args)
 
@@ -106,6 +105,20 @@ class Sh(object):
         self._stdin = stdin
         return self
 
+    def expand(self, expand):
+        '''
+        Turn off argument expansion, useful for 'grep'
+        :param expand: True or False
+        :return: self
+        '''
+        self._expand = expand
+        cmd = self._original_cmd
+        if len(cmd) == 1:
+            cmd = shlex.split(cmd[0])
+        cmd = [os.path.expanduser(os.path.expandvars(arg)) for arg in cmd]
+        self._cmd, self._args = cmd[0], cmd[1:]
+        return self
+
     @property
     def include_stderr(self):
         '''
@@ -137,15 +150,18 @@ class Sh(object):
 
     def __lt__(self, infile):
         '''
-        Redirects infile to stdin of the command. Usually placed after the first
-        command in the chain, not the last. Example:
+        Redirects infile to stdin of the first command in the chain.
+        Example, sort bashrc and show last lines:
 
-            (Sh('sort') < '~/.bashrc') | 'tail'
+            Sh('sort') | 'tail' < '~/.bashrc'
 
         :param infile: Filename or file-like object for reading.
         :return: self
         '''
-        self.stdin(infile)
+        t = self
+        while t._input is not None:
+            t = t._input
+        t.stdin(infile)
         return self
 
     def __gt__(self, outfile):
@@ -172,9 +188,10 @@ class Sh(object):
         '''
         if type(cmd) in (str, unicode):
             cmd = shlex.split(cmd)
-        if type(cmd) is Sh:
-            return self._sh(cmd)
-        return self._sh(*cmd)
+        if not type(cmd) is Sh:
+            cmd = Sh(*cmd)
+        self._append(cmd)
+        return cmd
 
     def __iter__(self):
         '''
@@ -212,8 +229,7 @@ class Sh(object):
         Runs the command and reads all stdout.
         :return: All stdout as a single string.
         '''
-        self._run()
-        stdout, _ = self._pop.communicate()
+        stdout, _ = self.communicate()
         return stdout
 
     __str__ = read
@@ -223,38 +239,35 @@ class Sh(object):
         Runs the command and reads all stdout into a list.
         :return: All stdout as a list of newline terminated strings.
         '''
-        self._run()
-        stdout, stderr = self._pop.communicate()
-        return stdout.splitlines(True)
+        return self.read().splitlines(True)
 
-    def _sh(self, cmd, *args):
+    def _append(self, sh):
         '''
         Internal. Chains a command after this.
-        :param cmd:
-        :param args:
-        :return: The new command.
+        :param sh: Next command.
         '''
-        if not type(cmd) is Sh:
-            cmd = Sh(cmd, *args)
-        cmd._input = self
-        self._output = cmd
+        sh._input = self
+        self._output = sh
         if self._env:
-            cmd._env = dict(self._env)
+            sh._env = dict(self._env)
         if self._cwd:
-            cmd._cwd = self._cwd
-        self._run()
-        return cmd
+            sh._cwd = self._cwd
 
     def _run(self, stdout=subprocess.PIPE):
         '''
-        Internal. Starts running this command. Requires that there is an output configured
-        beforehand and that all commands prior in the chain are running already.
-        :param stdout: Where to send stdout.
+        Internal. Starts running this command and those before it. Can only
+        be called once.
+        :param stdout: Where to send stdout for this link in the chain.
         '''
+        assert self._pop is None
+        if self._input is not None:
+            self._input._run()
+
         cwd = (self._cwd if self._cwd else os.getcwd()) + '/'
+
         def glob_or(expr):
             res = [expr]
-            if '*' in expr or '?' in expr:
+            if self._expand and ('*' in expr or '?' in expr):
                 if expr and expr[0] != '/':
                     expr = cwd + expr
                 res = glob.glob(expr)

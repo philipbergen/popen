@@ -30,3 +30,7 @@ if __name__ == '__main__':
 
     print "OK", Sh('ls').read()
     print "OK", Sh('ls').readlines()
+
+    print "EXPAND", Sh('ls') | Sh('grep', r'~a.*$').expand(False)
+    if Sh('rm polka') and Sh('rm ~/listing.txt'):
+        print "DONE"
