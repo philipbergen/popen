@@ -3,7 +3,7 @@ from distutils.core import setup
 setup(
     name = "popen",
     packages = ['popen'],
-    version = "0.1.16",
+    version = "0.1.17",
     description = "A shell-like DSL front for subprocess.Popen",
     long_description = open('README.rst').read(),
     author = "philipbergen",
