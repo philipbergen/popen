@@ -3,3 +3,6 @@
  - Adding < stdin redirect
  - Added read, readlines, communicated
  - Changed the __str__ to evaluate the command and return .read()
+2015-01-26:
+ - Changed the syntax for piping into stdin
+ - Added support for piping from string or iterable content
