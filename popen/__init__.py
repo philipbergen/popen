@@ -185,18 +185,18 @@ class Sh(object):
             t = t._output
         while t is not None:
             if t._pop and t._pop.returncode is None:
-                try:
-                    t._pop.kill()
-                    t._pop.wait()
-                except OSError:
-                    pass
+                t._pop.kill()
+                t._pop.wait()
             del t._pop
             t._pop = None
             t = t._input
         return self
 
     def __del__(self):
-        self.reset()
+        try:
+            self.reset()
+        except (OSError, IOError):
+            pass
 
     def __bool__(self):
         return self.returncode == 0
