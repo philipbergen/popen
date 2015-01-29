@@ -52,11 +52,13 @@ import shlex
 import sys
 import fcntl
 import select
+import signal
 from itertools import chain, islice
 
 
 class Sh(object):
     debug = False
+    set_sigchld_handler = True
 
     def __repr__(self):
         res = []
@@ -103,6 +105,10 @@ class Sh(object):
         self.expand(True)
         if self.debug:
             print "*** DEBUG: Sh(%r, %r)" % (self._cmd, self._args)
+        if Sh.set_sigchld_handler:
+            # Prevent Zombies from taking over the world
+            signal.signal(signal.SIGCHLD, Sh.sigchld_handler)
+            Sh.set_sigchld_handler = False
 
     def env(self, **kw):
         '''
@@ -113,7 +119,7 @@ class Sh(object):
         self._original_env = kw
         if self._env is None:
             self._env = dict(os.environ)
-        self._env.update({k:unicode(v) for k,v in kw.iteritems()})
+        self._env.update({k: unicode(v) for k, v in kw.iteritems()})
         return self
 
     def chdir(self, chdir):
@@ -179,8 +185,11 @@ class Sh(object):
             t = t._output
         while t is not None:
             if t._pop and t._pop.returncode is None:
-                t._pop.kill()
-                t._pop.wait()
+                try:
+                    t._pop.kill()
+                    t._pop.wait()
+                except OSError:
+                    pass
             del t._pop
             t._pop = None
             t = t._input
@@ -401,6 +410,16 @@ class Sh(object):
             pass
         return cls.Stdin.from_file(input)
 
+    @staticmethod
+    def sigchld_handler(signal, frame):
+        try:
+            while True:
+                pid, returncode = os.waitpid(-1, os.WNOHANG)
+                if not pid:
+                    break
+        except OSError:
+            pass
+
 
     class Stdin(object):
         '''
@@ -408,10 +427,12 @@ class Sh(object):
 
             Stdin.from_file(filename) | 'sort' | 'uniq'
         '''
+
         class FileFromIterator(object):
             '''
             Converts an iterator into a file like object.
             '''
+
             def __init__(self, src):
                 self._src = chain.from_iterable(src)
 
