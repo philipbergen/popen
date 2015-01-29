@@ -58,7 +58,7 @@ from itertools import chain, islice
 
 class Sh(object):
     debug = False
-    set_sigchld_handler = True
+    set_sigchld_handler = False
 
     def __repr__(self):
         res = []
@@ -195,7 +195,9 @@ class Sh(object):
     def __del__(self):
         try:
             self.reset()
-        except (OSError, IOError):
+        except OSError:
+            pass
+        except IOError:
             pass
 
     def __bool__(self):
@@ -275,7 +277,12 @@ class Sh(object):
         fds = [fd]
 
         while True:
-            ready, _, _ = select.select(fds, [], [])
+            try:
+                ready, _, _ = select.select(fds, [], [])
+            except select.error, e:
+                if e.args == (4, 'Interrupted system call'):
+                    continue
+                raise
             ready = ready[-1]
             data = ready.read()
             if not data:
@@ -418,6 +425,8 @@ class Sh(object):
                 if not pid:
                     break
         except OSError:
+            pass
+        except IOError:
             pass
 
 

@@ -8,3 +8,4 @@
  - Added support for piping from string or iterable content
 2015-01-29:
  - Fixed the __del__ exception handling
+ - Issues with the signal handler, disabled for now, pending better understanding
